@@ -37,42 +37,44 @@ export default async function handler(req, res) {
 
   // Basic validation of the structure of each appointment object.
   for (const appointment of currentAppointments) {
-    if (appointment && (!appointment.start || !appointment.end)) {
+    if (appointment && (typeof appointment !== 'object' || appointment === null || !appointment.start || !appointment.end)) {
       return res.status(400).json({
-        error: "Invalid currentAppointments format. Each appointment must have 'start' and 'end' properties.",
+        error: "Invalid currentAppointments format. Each appointment must be a non-null object with 'start' and 'end' properties.",
       });
     }
   }
 
   // Sort the current appointments by start time.
-  const sortedAppointments = [...currentAppointments].sort(
-    (a, b) => {
-        if (!a || !b) return 0; // handle null or undefined a or b
-        return new Date(a.start).getTime() - new Date(b.start).getTime()
-    }
-  );
+    const sortedAppointments = [...currentAppointments].sort(
+        (a, b) => {
+            if (!a || !b) return 0;
+             const dateA = a.start ? new Date(a.start).getTime() : -Infinity;
+              const dateB = b.start ? new Date(b.start).getTime() : -Infinity;
+            return dateA - dateB;
+        }
+    );
 
   const availableSlots = [];
   let currentSlotStart = new Date(startTime);
 
   // Function to check for overlaps
-    const overlaps = (slotStart, existingAppointments) => {
-        const slotEnd = new Date(slotStart);
-        slotEnd.setHours(slotEnd.getHours() + 1); // Check for 1-hour overlap
-    
-        for (const appointment of existingAppointments) {
-          if (!appointment || !appointment.start || !appointment.end) {
-            continue; // Skip invalid appointments
-          }
-            const appointmentStart = new Date(appointment.start);
-            const appointmentEnd = new Date(appointment.end);
-    
-            if (slotStart < appointmentEnd && slotEnd > appointmentStart) {
-                return true; // Overlap found
-            }
-        }
-        return false; // No overlap
-    };
+  const overlaps = (slotStart, existingAppointments) => {
+    const slotEnd = new Date(slotStart);
+    slotEnd.setHours(slotEnd.getHours() + 1); // Check for 1-hour overlap
+
+    for (const appointment of existingAppointments) {
+      if (!appointment || !appointment.start || !appointment.end) {
+        continue; // Skip invalid appointments
+      }
+      const appointmentStart = new Date(appointment.start);
+      const appointmentEnd = new Date(appointment.end);
+
+      if (slotStart < appointmentEnd && slotEnd > appointmentStart) {
+        return true; // Overlap found
+      }
+    }
+    return false; // No overlap
+  };
 
   // Generate slots in 30-minute intervals
   while (currentSlotStart < endTime) {
