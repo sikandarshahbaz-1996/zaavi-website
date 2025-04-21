@@ -35,24 +35,25 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'currentAppointments must be an array.' });
   }
 
-  // Basic validation of the structure of each appointment object.
-  for (const appointment of currentAppointments) {
-    if (appointment && (typeof appointment !== 'object' || appointment === null || !appointment.start || !appointment.end)) {
+  // Basic validation and filtering of the structure of each appointment object.
+  const validatedAppointments = currentAppointments.filter(appointment => {
+      return appointment && 
+             typeof appointment === 'object' && 
+             appointment !== null && 
+             typeof appointment.start === 'string' &&  // Ensure start is a string
+             typeof appointment.end === 'string';    // Ensure end is a string
+  });
+
+  if (validatedAppointments.length !== currentAppointments.length) {
       return res.status(400).json({
-        error: "Invalid currentAppointments format. Each appointment must be a non-null object with 'start' and 'end' properties.",
+          error: "Invalid currentAppointments format. Each appointment must be a non-null object with 'start' and 'end' properties, and these properties must be strings.",
       });
-    }
   }
 
   // Sort the current appointments by start time.
-    const sortedAppointments = [...currentAppointments].sort(
-        (a, b) => {
-            if (!a || !b) return 0;
-             const dateA = a.start ? new Date(a.start).getTime() : -Infinity;
-              const dateB = b.start ? new Date(b.start).getTime() : -Infinity;
-            return dateA - dateB;
-        }
-    );
+  const sortedAppointments = [...validatedAppointments].sort(
+    (a, b) => new Date(a.start).getTime() - new Date(b.start).getTime()
+  );
 
   const availableSlots = [];
   let currentSlotStart = new Date(startTime);
@@ -63,9 +64,6 @@ export default async function handler(req, res) {
     slotEnd.setHours(slotEnd.getHours() + 1); // Check for 1-hour overlap
 
     for (const appointment of existingAppointments) {
-      if (!appointment || !appointment.start || !appointment.end) {
-        continue; // Skip invalid appointments
-      }
       const appointmentStart = new Date(appointment.start);
       const appointmentEnd = new Date(appointment.end);
 
