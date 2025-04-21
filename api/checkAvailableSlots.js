@@ -1,10 +1,13 @@
-export default function handler(req, res) {
-  // Get the startDateTime and endDateTime from the query parameters.
-  const { startDateTime, endDateTime } = req.query;
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method Not Allowed' }); // Handle only POST requests
+  }
+
+  const { startDateTime, endDateTime, currentAppointments } = req.body;
 
   // Check if startDateTime and endDateTime are provided
   if (!startDateTime || !endDateTime) {
-    return res.status(400).json({ error: "startDateTime and endDateTime are required query parameters." });
+    return res.status(400).json({ error: 'startDateTime and endDateTime are required in the request body.' });
   }
 
   // Parse the start and end times into Date objects.
@@ -19,31 +22,25 @@ export default function handler(req, res) {
     data: {
       [startDateString]: [],
     },
-    status: "success",
+    status: 'success',
   };
 
   // If the start time is after the end time, return an empty data set.
   if (startTime >= endTime) {
-    return res.status(200).json(result); // Changed to 200 for consistency
+    return res.status(200).json(result);
   }
 
-  //  currentAppointments will also come from query params.  It will be a stringified JSON array.
-    const currentAppointmentsParam = req.query.currentAppointments;
-    let currentAppointments = [];
+  // Ensure currentAppointments is an array
+  if (!Array.isArray(currentAppointments)) {
+    return res.status(400).json({ error: 'currentAppointments must be an array.' });
+  }
 
-    if (currentAppointmentsParam) {
-        try {
-            currentAppointments = JSON.parse(currentAppointmentsParam);
-            // Basic validation of the structure of each appointment object.
-             for (const appointment of currentAppointments) {
-                if (!appointment.start || !appointment.end) {
-                    return res.status(400).json({ error: "Invalid currentAppointments format.  Each appointment must have 'start' and 'end' properties." });
-                }
-            }
-        } catch (error) {
-             return res.status(400).json({ error: "Invalid currentAppointments format.  Must be a valid JSON array of objects with start and end properties." });
-        }
+  // Basic validation of the structure of each appointment object.
+  for (const appointment of currentAppointments) {
+    if (!appointment.start || !appointment.end) {
+      return res.status(400).json({ error: "Invalid currentAppointments format. Each appointment must have 'start' and 'end' properties." });
     }
+  }
 
   // Sort the current appointments by start time.
   const sortedAppointments = [...currentAppointments].sort(
@@ -77,9 +74,10 @@ export default function handler(req, res) {
     availableSlots.push({ start: currentSlotStart.toISOString() });
   }
 
-    // Filter out any slots that are before the startDateTime
-    const filteredSlots = availableSlots.filter(slot => new Date(slot.start) >= startTime);
-
+  // Filter out any slots that are before the startDateTime
+  const filteredSlots = availableSlots.filter(
+    (slot) => new Date(slot.start) >= startTime
+  );
 
   // Add the available time slots to the result object.
   result.data[startDateString] = filteredSlots;
